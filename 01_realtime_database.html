@@ -92,7 +92,7 @@
     guiFolderLight.add(light, 'intensity').step(0.01).onChange(function(value){
       console.log('GUI: light.intensity', value);
       firebase.database().ref('light/intensity').set(value);
-    });
+    }).listen();
     guiFolderLight.open();
 
     // instantiate a loader
