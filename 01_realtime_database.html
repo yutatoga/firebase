@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>firebase</title>
+  <style>
+  body {
+    margin: 0;
+    overflow: hidden;
+  }
+
+  </style>
+</head>
+<body>
+
+  <!-- firebase -->
+  <script src="https://www.gstatic.com/firebasejs/5.2.0/firebase.js"></script>
+  <script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyDHYzlkaWqxVBpLejpkpMQ7yjShZdVEONw",
+    authDomain: "lightghostar.firebaseapp.com",
+    databaseURL: "https://lightghostar.firebaseio.com",
+    projectId: "lightghostar",
+    storageBucket: "lightghostar.appspot.com",
+    messagingSenderId: "678263276889"
+  };
+  firebase.initializeApp(config);
+  </script>
+
+  <script type="text/javascript" src="/js/three.js"></script>
+  <script type="text/javascript" src="/js/OBJLoader.js"></script>
+  <script type="text/javascript" src="/js/OrbitControls.js"></script>
+  <script type="text/javascript" src="/js/stats.min.js"></script>
+  <script type="text/javascript" src="/js/dat.gui.min.js"></script>
+  <script>
+
+  var Settings = function(){
+    // mesh
+    this.isMeshVisible = true;
+    this.enableWireframe = false;
+
+    // points
+    this.isPointsVisible = false;
+
+    // gridHelper
+    this.isGridHelperVisible = true;
+  };
+  var settings = new Settings();
+  var gui = new dat.GUI();
+
+  var scene, camera, renderer;
+  var light;
+
+  // debug
+  var stats;
+
+  init();
+  animate();
+
+  function init(){
+    // scene
+    scene = new THREE.Scene();
+
+    // renderer
+    renderer = new THREE.WebGLRenderer({
+      antialias: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    // camera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 1000);
+    camera.position.set(0, 1.5, 2.5);
+
+    // OrbitControls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    // - damping
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.25; // default is 0.25
+    controls.zoomSpeed = 0.5; // default is 1
+    // - auto rotate
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.2; // default is 2.0
+
+    // light
+    light = new THREE.DirectionalLight(0xffffff);
+    light.position.set(0, 1, 0);
+    scene.add(light);
+    var guiFolderLight = gui.addFolder('Light');
+    guiFolderLight.add(light, 'intensity').step(0.01).onChange(function(value){
+      console.log('GUI: light.intensity', value);
+      firebase.database().ref('light/intensity').set(value);
+    });
+    guiFolderLight.open();
+
+    // instantiate a loader
+    var loaderOBJ = new THREE.OBJLoader();
+    console.log(loaderOBJ.isPoint);
+
+    // load a resource
+    loaderOBJ.load(
+      // resource URL
+      '/model/bunny.obj',
+      // called when resource is loaded
+      function (object) {
+        // mesh bunny
+        object.position.set(0, 0, 0);
+        object.name = "bunnyMesh";
+        object.visible = settings.isMeshVisible;
+        scene.add(object);
+
+        var guiFolderMesh = gui.addFolder('Mesh');
+        guiFolderMesh.add(object, 'visible');
+        guiFolderMesh.open();
+
+        object.traverse(function (child){
+          if (child instanceof THREE.Mesh){
+            // material for bunnyMesh
+            child.material.wireframe = settings.enableWireframe;
+
+            guiFolderMesh.add(child.material, 'wireframe');
+
+            // points bunny
+            var pointsMaterial = new THREE.PointsMaterial( {
+              color: 0xFF0000,
+              size: 0.005,
+              blending: THREE.AdditiveBlending,
+              transparent: true,
+              sizeAttenuation: true
+            } );
+            var points = new THREE.Points(child.geometry, pointsMaterial);
+            points.position.set(0, 0, 0);
+            points.name = "bunnyPoints";
+            points.visible = settings.isPointsVisible;
+            scene.add(points);
+
+            // gui for points
+            var guiFolderPoints = gui.addFolder('Points');
+            guiFolderPoints.add(points, 'visible');
+            guiFolderPoints.open();
+          }
+        });
+
+      },
+      // called when loading is in progresses
+      function (xhr) {
+        console.log((xhr.loaded/xhr.total * 100) + '% loaded');
+      },
+      // called when loading has errors
+      function (error) {
+        console.log('An error happened');
+      }
+    );
+
+    // GridHelper
+    var size = 10;
+    var divisions = 10;
+    var gridHelper = new THREE.GridHelper(size, divisions);
+    gridHelper.name = "gridHelper";
+    gridHelper.visible = settings.isGridHelperVisible;
+    scene.add(gridHelper);
+
+    // - gridHelper
+    var guiFolderGridHelper = gui.addFolder('GridHelper');
+    guiFolderGridHelper.add(gridHelper, 'visible');
+    guiFolderGridHelper.open();
+
+    // debug
+    stats = new Stats();
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
+
+    var intensityRef = firebase.database().ref('light/intensity');
+    intensityRef.on('value', function(snapshot) {
+      console.log('Firebase: light/intensity', snapshot.val());
+      light.intensity = snapshot.val();
+    });
+
+  }
+
+  function animate() {
+    stats.begin();
+    controls.update();
+    renderer.render(scene, camera);
+    stats.end();
+  	requestAnimationFrame(animate);
+  }
+
+  </script>
+</body>
+</html>
